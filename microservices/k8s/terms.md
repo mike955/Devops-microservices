@@ -171,3 +171,45 @@ spec:
   name: php-apache
  targetCPUUtilizationPercentage: 90  #cpu使用率超过90%自动扩容
  ```
+
+7.StatefulSet
+
+StatefulSet里的每个pod都有稳定唯一的标识
+
+- StatefulSet里的每个pod都有稳定唯一的标识，可以用来发现集群内的其他成员，假如StatefulSet的名字叫kafka，那么第一个pod叫kafka-0，第二个叫kafka-1，以此类推。
+- StatefulSet控制的pod副本的启停顺序是受控的，操作第n个pod的时候，前n-1个pod已经是允许且是准备好的状态
+- StatefulSet里的pod采用稳定的持久化存储卷，通过PV/PVC来实现，剔除pod时不会删除与StatefulSet相关的存储卷
+
+8.Service
+
+Service是一个服务，管理着一组pod，与pod之间通过label selector来进行选择。
+
+ - k8s为每个service分配了一个全局唯一的虚拟IP地址，称为clusterIP
+ - 整个service生命周期内，clusterIP不会发生变化
+ - 创建一个service
+ ```yaml
+apiVersion: v1
+kind: Service
+metadata:
+ name: tomcat-service #service的名字
+spec:
+ type: NodePort
+ ports:
+  - port: 8080      #service端口号
+    nodePort: 31002 #集群外部访问serivice的端口号
+ selector:
+  tier: frontend    #选取label为“tier=frontend”的pod
+ ```
+ - 外部系统访问service
+    - k8s里的三种ip
+        - NodeIP: Node节点的IP
+        - PodIP: Pod的IP地址，节点的无力网卡IP地址
+        - ClusterIP: Service的IP地址
+            - 仅作用于当前service，由k8s管理和分配，是一个虚拟的ip
+            - 无法被ping通
+            - 无法在集群外部使用这个地址
+    - 通过 k8s的service的IP:想要访问service的nodePort
+
+9.命名空间
+
+用户隔离资源，将集群内部的资源对象"分配"到不同的Namespace中，不同namespace中的服务不能通信
