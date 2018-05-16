@@ -1,6 +1,12 @@
 ## 深度掌握service
 
-1.service定义
+1.service理解
+
+ - service定义一系列Pod以及访问这些Pod的策略的一层抽象
+ - service用与将一组label相同的pod组成一个服务，创建一个DNS入口，提供负载均衡和服务发现
+ - 每个service会分配一个ClusterIP和DNS名，其它容器可以通过该地址和DNS来访问该服务
+
+2.service定义
 
 ```yaml
 apiVersion: v1              # 必须，版本号
@@ -30,7 +36,7 @@ spec:                       # 必须，详细描述
     hostname: string        # 外部负载均衡器主机名
 ```
 
-2.多端口Service
+3.多端口Service
 
 ```yaml
 ...
@@ -46,7 +52,7 @@ sepc:
    protocol: UDP
 ```
 
-3.外部Service
+4.外部Service
 
 某些环境中，系统需要一个外部数据库或将另一个集群作为后端，这时需要创建一个无label selector的service来实现
 

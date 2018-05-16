@@ -1,6 +1,12 @@
 ## 深度掌握pod
 
-1.pod定义
+1.pod理解
+
+ - pod是k8s调度的最小单位
+ - pod是一组紧密关联的容器集合，共享PID、IPC、Network和UTS namespace
+ - pod只有集群自动分配的ip，没有端口，如果访问容器，使用podIP:containerPort(EndPoint)
+
+2.pod定义
 
 ```yaml
 apiVersion: v1   			#required，版本号
@@ -81,7 +87,7 @@ spec:						#必须，pod中容器详细定义
        path: stirng
 ```
 
-2.pod基本用法
+3.pod基本用法
 
 ```sh
 kubectl create -f name-pod.yaml		# 以name-pod.yaml模版创建pod
@@ -91,14 +97,14 @@ kubectl get po				# 查看已创建的pod
 kubectl describe pod po-name		# 查看名为po-name的pod详情
 ```
 
-3.静态pod
+4.静态pod
 
-3.1 创建静态pod
+4.1 创建静态pod
 
  - 配置文件
  - http方式
 
-4.pod共享volume
+5.pod共享volume
 
 ```yaml
 apiVersion: v1
@@ -126,15 +132,15 @@ spec:
 ```
  *可以理解为tomcat容器将自身的/usr/local/tomcat/logs目录映射到pod的app-log存储卷，logreader容器将自身的/logs目录映射到pod的app-logs的存储卷，通过映射，logreader就可以读取tomcat容器内的文件*
 
-5.pod管理配置
+6.pod管理配置
 
-5.1 ConfigMap应用场景
+6.1 ConfigMap应用场景
 
  - 生成容器内环境参数
  - 设置容器启动命令的启动参数
  - 以Volume的形式挂载为容器内部的文件或目录
 
-5.2 创建方式
+6.2 创建方式
 
 ```sh
 kubectl create configMap 				# 通过命令工具
@@ -142,7 +148,7 @@ kubectl create configMap 				# 通过命令工具
 kubectl create -f configMap-name.yaml 	# 通过配置文件
 ```
 
-5.2.1 yaml文件创建方式
+6.2.1 yaml文件创建方式
 
 ```yaml
 apiVersin: v1
