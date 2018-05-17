@@ -124,6 +124,112 @@ spec:
 
 #### 6.1 Flannel
 
+flannel可以搭建k8s依赖的底层网络，是因为它可以实现以下两点：
+
+ - 它能协助k8s，给每一个Node上的Docker容器分配互相补不冲突的IP地址
+ - 它能在这些IP地址之间建立一个覆盖网络(Overlay Network)，通过这个覆盖网络，将数据包原封不动地传递到目标容器
+
+实现原理：
+
+ - flannel首先创建了一个名为flannel0的网桥，这个网桥一段连接docker0，另一段连接一个叫flanneId的服务进程
+ - flanneld进程首先上连etcd，利用etcd来管理可分配的IP地址段资源，同时监控etcd中每个pod的实际地址，并在内存中建立了一个pod节点路由表
+ - flanneld下连docker0和无物理网络，使用内存中的pod节点路由表，将docker0发给它的数据包包装起来，利用物理网络的连接将数据包投递到目标FlanneId上，从而完成pod到pod之间的直接的地址通信
+ - flannel之间的底层通信协议可选余地有很多，有UDP、VxLan、AWS VPC等；源flanneld加包，目标flanneld解包；常用的是UDP协议
+
+其它：
+
+ - flannel完美实现了对k8s网络的支持，但是引入了多个网络组件，会带来一定网络延时
+ - 在大流量、高并发应用场景下还需反复测试
+
+Flannel安装和配置
+
+（1）安装etcd
+
+（2）安装Flannel
+
+&emsp;&emsp;需要在每台Node上都安装Flannel，将下载的压缩包xxx.tar.gz解压，把二进制文件falnnelId和mk-docker-opts.sh复制到/usr/bin(或PATH环境变量中)中，完成安装；
+
+（3）配置Flannel
+
+&emsp;&emsp;1.以systemd系统为例对flanneld服务进行配置，编辑配置文件/usr/lib/systemd/system/flanneld.service:
+
+```service
+[Unit]
+Description=flanneld overlay address etcd agent
+After=network.target
+Before=docker.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/flanneld
+ExecStart=/usr/bin/Flanneld -etcd-endpoint=${FLANNEL_ETCD} $FLANNEL_OPTIONS
+
+[Install]
+RequiredBy=docker.service
+WantedBy=multi-user.target
+```
+
+&emsp;&emsp;2.编辑配置文件/etc/sysconfig/flannel，设置etcd的URL地址：
+
+```sh
+# flanneld configuration options
+
+# etcd url localtion. Point this to the server where etcd runs
+FLANNEL_ETCD="http://192.168.18.3:2379"
+
+# etcd config key. This is the configuration key that flannel queries
+# For address range assignment
+FLANNEL_ETCD_KEY="/coreos.com/network"
+```
+
+启动flanneld服务之前，需要在etcd中添加一条网络配置设置，这个配置将用于flanneld分配给每个Docker的虚拟IP地址段
+
+```sh
+etcdctl set /coreos.com/network/config '{"Network": "10.1.0.0/16"}'
+```
+由于Flannel将覆盖docker0网桥，所以Docker服务已启动，则需要停止Docker服务
+
+
+&emsp;&emsp;3.启动flanneld服务
+
+```sh
+systemctl restart flanneld
+```
+
+&emsp;&emsp;4.设置docker0网桥ID地址
+
+```sh
+mk-docker-opts.sh -i
+source /run/flannel/subnet.env
+ifconfig docker0 ${FLANNEL_SUBNET}
+```
+
+&emsp;&emsp;5.重新启动Docker服务
+
+```sh
+systemctl restart docker
+```
+
 #### 6.2 Open vSwitch
 
 #### 6.3 Calico
+
+相关介绍
+
+ - Calico是一个基于BGP的纯三层网络方案
+ - Calico在每个计算节点利用Linux Kernel实现一个高效的vRouter来负责数据转发
+ - 每个vRouter通过BGP1协议把在本节点上运行的容器的路由信息向整个Calico网络广播，并自动设置到达其他节点的路由妆法规则
+ - Calico保证所有容器之间的数据流量都是通过IP路由的方式完成互联互通的
+ - Calico节点组网可以直接利用数据中心的网络结构，不需要额外的NAT、隧道或者Overlay Network，没有额外的封包解包，能够节约CPU运算，提高网络效率
+ - Calico在小规模集群中可以直接互联，大规模集群中可以通过额外的BGP route reflector来完成
+ - Calico基于Iptables提供了丰富的网络策略
+
+Cailico主要主键
+
+ - Felix：Calico Agent，运行在每台Node上，负责为容器设置网络资源（IP地址、路由规则、Iptables规则等），包住夸主机容器网络互通
+ - etcd：Calico使用的后端存储
+ - BGP Client(BIRD)：负责吧Felix在各个Node上设置的路由信息通过BGP协议广播到Calico网络
+ - BGP Route Reflector(BIRD)：通过一个或多个BGP Route Reflector来完成大规模集群的分级路由分发
+ - calicoctl：Calico命令行管理工具
+
+部署Calico服务
