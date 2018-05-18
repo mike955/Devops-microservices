@@ -224,7 +224,7 @@ systemctl restart docker
  - Calico在小规模集群中可以直接互联，大规模集群中可以通过额外的BGP route reflector来完成
  - Calico基于Iptables提供了丰富的网络策略
 
-Cailico主要主键
+Cailico主要组件
 
  - Felix：Calico Agent，运行在每台Node上，负责为容器设置网络资源（IP地址、路由规则、Iptables规则等），包住夸主机容器网络互通
  - etcd：Calico使用的后端存储
@@ -233,3 +233,16 @@ Cailico主要主键
  - calicoctl：Calico命令行管理工具
 
 部署Calico服务
+
+（1）修改k8s启动参数，并重启服务
+
+ - 设置master上kube-apiserver服务的启动参数：--allow-privilege=true(因为calico-node需要以特权模式运行在各node上)
+ - 设置各node上kubelet服务的启动参数：--network-plugin=cni(使用CNI网络插件)
+
+（2）创建Calico服务，主要包括calico-node和calico policy controller，需要创建的资源对象如下：
+
+ - 创建ConfigMap calico-config，包括Calico所需的配置参数
+ - 创建Secret calico-etcd-secrets，用于使用TLS方式连接etcd
+ - 在每个Node上运行calico/node容器，部署位DaemonSet
+ - 在每个Node上安装Calico CNI二进制文件和网络配置参数(由install-cni容器完成)
+ - 部署一个名为calico/kube-policy-controller的Deployment，以对接k8s集群中为pod设置的Network Policy
